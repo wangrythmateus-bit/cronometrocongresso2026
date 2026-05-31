@@ -7,10 +7,11 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
-        // --- SEGURANÇA DE ACESSO (O Segurança da Porta) ---
+        // --- SEGURANÇA DE ACESSO ---
         const token = localStorage.getItem('token');
+        const role = localStorage.getItem('role'); // Pega o nível de acesso (admin ou membro)
         if (!token) {
-            window.location.href = '/login.html'; // Expulsa para o login se não tiver pulseira
+            window.location.href = '/login.html';
         }
     </script>
     <style>
@@ -40,8 +41,8 @@
                 Status: <span class="text-green-600">Conectado</span> 
                 <div class="w-3 h-3 bg-green-500 rounded-full"></div>
             </div>
-            <button onclick="fazerLogout()" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1 rounded transition border border-red-200">
-                <i class="fas fa-sign-out-alt"></i> Sair
+            <button onclick="fazerLogout()" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1 rounded transition border border-red-200" title="Sair do sistema">
+                <i class="fas fa-sign-out-alt mr-1"></i> Sair (<span id="nome-usuario-logado">...</span>)
             </button>
         </div>
     </nav>
@@ -75,7 +76,7 @@
                             </thead>
                             <tbody id="tabela-discursos"></tbody>
                         </table>
-                        <div id="msg-vazio" class="hidden text-center text-gray-400 text-sm py-4 italic">Nenhum discurso cadastrado para este dia.</div>
+                        <div id="msg-vazio" class="hidden text-center text-gray-400 text-sm py-4 italic">Nenhum discurso cadastrado.</div>
                     </div>
                 </div>
 
@@ -91,11 +92,11 @@
                         <button onclick="adicionarDiscurso()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-blue-800 transition">ADICIONAR</button>
                     </div>
                     <div id="box-importacao" class="hidden flex-col gap-2">
-                        <p class="text-xs text-gray-500 font-medium">Cole a lista abaixo separada por traços (<strong class="text-gray-800">TEMA - ORADOR - TEMPO</strong>). Um discurso por linha.</p>
-                        <textarea id="texto-importacao" rows="4" class="border p-2 rounded w-full text-sm font-medium" placeholder="Exemplo:&#10;Alegre-se com a esperança - João Silva - 30&#10;Perseverem em oração - Marcos Paulo - 20"></textarea>
+                        <p class="text-xs text-gray-500 font-medium">Cole a lista abaixo separada por traços (<strong class="text-gray-800">TEMA - ORADOR - TEMPO</strong>).</p>
+                        <textarea id="texto-importacao" rows="4" class="border p-2 rounded w-full text-sm font-medium"></textarea>
                         <div class="flex justify-end gap-2">
                             <button onclick="toggleImportacao()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-semibold hover:bg-gray-300">CANCELAR</button>
-                            <button onclick="importarEmMassa()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-blue-800">PROCESSAR LISTA</button>
+                            <button onclick="importarEmMassa()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-blue-800">PROCESSAR</button>
                         </div>
                     </div>
                 </div>
@@ -133,31 +134,46 @@
         </div>
     </div>
 
-    <div id="aba-config" class="hidden flex-1 flex flex-col items-center pt-10">
-        <div class="card p-8 w-full max-w-2xl">
-            <h2 class="text-center font-bold text-xl text-jw-green mb-8 uppercase tracking-widest">Configurações do Sistema</h2>
-            <div class="space-y-6">
+    <div id="aba-config" class="hidden flex-1 flex flex-col items-center pt-6 overflow-y-auto">
+        <div class="card p-8 w-full max-w-2xl mb-8">
+            <h2 class="text-center font-bold text-xl text-jw-green mb-6 uppercase tracking-widest">Configurações do Sistema</h2>
+            <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2 text-center">Título principal</label>
-                    <input type="text" id="cfg-titulo" oninput="salvarConfigs()" class="w-full border p-3 rounded-lg text-center font-semibold text-lg text-gray-800">
+                    <label class="block text-sm font-bold text-gray-700 mb-1 text-center">Título principal</label>
+                    <input type="text" id="cfg-titulo" oninput="salvarConfigs()" class="w-full border p-2 rounded-lg text-center font-semibold text-gray-800">
                 </div>
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2 text-center">Subtítulo</label>
-                    <textarea id="cfg-subtitulo" oninput="salvarConfigs()" class="w-full border p-3 rounded-lg text-center font-medium text-gray-700" rows="2"></textarea>
+                    <label class="block text-sm font-bold text-gray-700 mb-1 text-center">Subtítulo</label>
+                    <textarea id="cfg-subtitulo" oninput="salvarConfigs()" class="w-full border p-2 rounded-lg text-center font-medium text-gray-700" rows="2"></textarea>
                 </div>
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2 text-center">Alerta amarelo faltando quantos minutos?</label>
-                    <input type="number" id="cfg-amarelo" oninput="salvarConfigs()" class="w-full border p-3 rounded-lg text-center font-medium">
+                    <label class="block text-sm font-bold text-gray-700 mb-1 text-center">Alerta amarelo faltando (minutos)</label>
+                    <input type="number" id="cfg-amarelo" oninput="salvarConfigs()" class="w-full border p-2 rounded-lg text-center font-medium">
                 </div>
                 <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2 text-center">Rodapé</label>
-                    <input type="text" id="cfg-rodape" oninput="salvarConfigs()" class="w-full border p-3 rounded-lg text-center text-sm font-medium text-gray-500">
+                    <label class="block text-sm font-bold text-gray-700 mb-1 text-center">Rodapé</label>
+                    <input type="text" id="cfg-rodape" oninput="salvarConfigs()" class="w-full border p-2 rounded-lg text-center text-sm font-medium text-gray-500">
                 </div>
-                <div class="flex gap-4 pt-4">
+                <div class="flex gap-4 pt-2">
                     <button onclick="window.open('/display.html', '_blank')" class="flex-1 bg-jw-green text-white p-3 rounded-lg font-bold hover:bg-green-900 shadow">Abrir monitor</button>
-                    <button onclick="limparTudo()" class="flex-1 bg-red-600 text-white p-3 rounded-lg font-bold hover:bg-red-800 shadow"><i class="fas fa-trash-alt mr-2"></i>Apagar Tudo (Reset)</button>
+                    <button id="btn-reset-tudo" onclick="limparTudo()" class="flex-1 bg-red-600 text-white p-3 rounded-lg font-bold hover:bg-red-800 shadow"><i class="fas fa-trash-alt mr-2"></i>Apagar Tudo</button>
                 </div>
             </div>
+
+            <div id="secao-usuarios" class="mt-8 pt-6 border-t border-gray-200">
+                <h3 class="text-center font-bold text-lg text-jw-green mb-4 uppercase"><i class="fas fa-users-cog mr-2"></i>Gerenciar Parceiros</h3>
+                <div class="flex gap-2">
+                    <input type="text" id="novo-user-login" placeholder="Novo usuário" class="border p-2 rounded flex-1 text-sm font-medium">
+                    <input type="password" id="novo-user-senha" placeholder="Senha forte" class="border p-2 rounded flex-1 text-sm font-medium">
+                    <select id="novo-user-nivel" class="border p-2 rounded text-sm font-bold bg-gray-50">
+                        <option value="membro">Membro (Padrão)</option>
+                        <option value="admin">Administrador</option>
+                    </select>
+                    <button onclick="criarUsuario()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-blue-800 transition">CRIAR</button>
+                </div>
+                <p class="text-xs text-gray-500 mt-3 text-center"><strong>Membros:</strong> Podem rodar o cronômetro. <strong>Admins:</strong> Podem apagar dados e criar usuários.</p>
+            </div>
+
         </div>
     </div>
 
@@ -179,12 +195,21 @@
             rodape: "© 2026 Congresso das Testemunhas de Jeová"
         };
 
-        // --- FUNÇÃO DE LOGOUT ---
+        // --- SISTEMA DE LOGOUT E PERMISSÕES ---
         function fazerLogout() {
-            localStorage.removeItem('token');
-            localStorage.removeItem('role');
-            localStorage.removeItem('username');
+            localStorage.clear();
             window.location.href = '/login.html';
+        }
+
+        function aplicarPermissoes() {
+            // Mostra o nome de quem está logado lá no botão superior direito
+            document.getElementById('nome-usuario-logado').innerText = localStorage.getItem('username') || '...';
+
+            // Se for apenas membro, esconde os poderes perigosos
+            if (role !== 'admin') {
+                document.getElementById('secao-usuarios').style.display = 'none';
+                document.getElementById('btn-reset-tudo').style.display = 'none';
+            }
         }
 
         function mudarAba(aba) {
@@ -213,7 +238,7 @@
             importacao.classList.toggle('flex');
         }
 
-        // Requisições agora enviam o Token de Segurança
+        // --- DADOS (MongoDB + JWT) ---
         async function carregarDoBanco() {
             try {
                 const resposta = await fetch('/api/discursos', {
@@ -235,6 +260,11 @@
             } else {
                 document.getElementById('msg-vazio').classList.add('hidden');
                 discursosDoDia.forEach((d, index) => {
+                    // Só cria o botão de excluir se for admin
+                    const btnExcluir = role === 'admin' 
+                        ? `<button onclick="removerDiscurso('${d._id}')" class="text-red-500 hover:text-red-700 mx-1 p-1" title="Apagar Discurso"><i class="fas fa-trash"></i></button>`
+                        : '';
+
                     tbody.innerHTML += `
                         <tr class="border-b hover:bg-gray-50 transition">
                             <td class="py-2 text-center font-bold text-gray-500">${index + 1}</td>
@@ -242,8 +272,8 @@
                             <td class="py-2 font-medium text-gray-600">${d.orador}</td>
                             <td class="py-2 text-center font-bold">${d.tempoMinutos}:00</td>
                             <td class="py-2 text-center">
-                                <button onclick="carregarDiscurso('${d._id}')" class="text-green-600 hover:text-green-800 mx-1 p-1"><i class="fas fa-play-circle text-xl"></i></button>
-                                <button onclick="removerDiscurso('${d._id}')" class="text-red-500 hover:text-red-700 mx-1 p-1"><i class="fas fa-trash"></i></button>
+                                <button onclick="carregarDiscurso('${d._id}')" class="text-green-600 hover:text-green-800 mx-1 p-1" title="Carregar no Cronômetro"><i class="fas fa-play-circle text-xl"></i></button>
+                                ${btnExcluir}
                             </td>
                         </tr>`;
                 });
@@ -314,15 +344,52 @@
         async function removerDiscurso(id) {
             if(!confirm("Tem certeza que deseja apagar?")) return;
             try {
-                await fetch(`/api/discursos/${id}`, { 
+                const resposta = await fetch(`/api/discursos/${id}`, { 
                     method: 'DELETE',
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
-                discursos = discursos.filter(d => d._id !== id);
-                renderizarTabela();
+                if(resposta.ok) {
+                    discursos = discursos.filter(d => d._id !== id);
+                    renderizarTabela();
+                } else {
+                    alert("Apenas administradores podem apagar.");
+                }
             } catch (erro) { alert("Erro ao apagar!"); }
         }
 
+        // --- NOVO: CRIAR PARCEIRO (USUÁRIO) ---
+        async function criarUsuario() {
+            const username = document.getElementById('novo-user-login').value;
+            const password = document.getElementById('novo-user-senha').value;
+            const userRole = document.getElementById('novo-user-nivel').value;
+
+            if(!username || !password) return alert("Preencha o usuário e a senha!");
+
+            try {
+                const resposta = await fetch('/api/usuarios', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ username, password, role: userRole })
+                });
+
+                const data = await resposta.json();
+
+                if(resposta.ok) {
+                    alert(`Usuário "${username}" criado com sucesso!`);
+                    document.getElementById('novo-user-login').value = '';
+                    document.getElementById('novo-user-senha').value = '';
+                } else {
+                    alert("Erro: " + data.error);
+                }
+            } catch(e) {
+                alert("Erro de conexão ao criar usuário.");
+            }
+        }
+
+        // --- CRONÔMETRO ---
         function carregarDiscurso(id) {
             clearInterval(timerInterval);
             discursoAtivo = discursos.find(d => d._id === id);
@@ -374,6 +441,7 @@
             });
         }
 
+        // --- CONFIGURAÇÕES ---
         function carregarConfigs() {
             const salvas = JSON.parse(localStorage.getItem('configuracoes')) || configPadrao;
             document.getElementById('cfg-titulo').value = salvas.titulo;
@@ -408,6 +476,7 @@
         }
 
         window.onload = () => {
+            aplicarPermissoes(); // Esconde os botões se for apenas Membro
             carregarConfigs();
             carregarDoBanco(); 
         };
