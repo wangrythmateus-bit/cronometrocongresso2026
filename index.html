@@ -166,7 +166,7 @@
     <script>
         const socket = io();
         let diaAtivo = 'sexta'; // O dia padrão ao abrir
-        let discursos = JSON.parse(localStorage.getItem('discursos')) || [];
+        let discursos = []; // Agora vai começar vazio e buscar da nuvem
         
         // Correção para discursos salvos anteriormente sem o "dia" configurado
         discursos.forEach(d => { if(!d.dia) d.dia = 'sexta'; });
