@@ -40,7 +40,7 @@
 
     <div id="aba-painel" class="flex flex-col flex-1 overflow-hidden">
         
-   <header class="mb-4 rounded-lg overflow-hidden shadow-sm border border-gray-300 flex-shrink-0 bg-white">
+        <header class="mb-4 rounded-lg overflow-hidden shadow-sm border border-gray-300 flex-shrink-0 bg-white">
             <img src="cabecalho.png" class="w-full h-auto block" alt="Cabeçalho">
         </header>
 
@@ -69,7 +69,7 @@
                                     <th class="pb-2 text-center">Tempo</th>
                                     <th class="pb-2 text-center">Ações</th>
                                 </tr>
-                            </thead>
+                            </tbody>
                             <tbody id="tabela-discursos"></tbody>
                         </table>
                         <div id="msg-vazio" class="hidden text-center text-gray-400 text-sm py-4 italic">Nenhum discurso cadastrado para este dia.</div>
@@ -78,7 +78,7 @@
 
                 <div class="card p-4 border-l-4 border-blue-600">
                     <div class="flex justify-between items-center mb-3">
-                        <h2 class="font-bold text-sm text-gray-700 uppercase">Adicionar à Programação</h2>
+                        <h2 class="font-bold text-sm text-gray-700 uppercase mb-1">Adicionar à Programação</h2>
                         <button onclick="toggleImportacao()" class="text-xs font-bold text-blue-600 hover:text-blue-800 underline"><i class="fas fa-paste mr-1"></i>Importar Lista</button>
                     </div>
                     
@@ -165,16 +165,14 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        let diaAtivo = 'sexta'; // O dia padrão ao abrir
-        let discursos = []; // Agora vai começar vazio e buscar da nuvem
-        
-        // Correção para discursos salvos anteriormente sem o "dia" configurado
-        discursos.forEach(d => { if(!d.dia) d.dia = 'sexta'; });
+        let diaAtivo = 'sexta'; 
+        let discursos = []; // Inicializa vazio para carregar do MongoDB
 
         let discursoAtivo = null;
         let timerInterval;
         let tempoRestante = 0;
         let tempoTotalSegundos = 0;
+        let horaAlvo = 0; // Variável para controle de timestamp (Minimização de tela)
 
         const configPadrao = {
             titulo: "Felicidade Eterna",
@@ -221,7 +219,18 @@
             }
         }
 
-        // --- FUNÇÕES DE DADOS (DISCURSOS E CONFIG) ---
+        // --- FUNÇÃO PARA CARREGAR OS DADOS DO MONGODB ---
+        async function carregarDoBanco() {
+            try {
+                const resposta = await fetch('/api/discursos');
+                discursos = await resposta.json();
+                renderizarTabela();
+            } catch (erro) {
+                console.error("Erro ao carregar do MongoDB:", erro);
+            }
+        }
+
+        // --- FUNÇÕES DE INTERFACE DA TABELA ---
         function renderizarTabela() {
             const tbody = document.getElementById('tabela-discursos');
             tbody.innerHTML = '';
@@ -241,36 +250,46 @@
                             <td class="py-2 font-medium text-gray-600">${d.orador}</td>
                             <td class="py-2 text-center font-bold">${d.tempoMinutos}:00</td>
                             <td class="py-2 text-center">
-                                <button onclick="carregarDiscurso('${d.id}')" class="text-green-600 hover:text-green-800 mx-1 p-1" title="Carregar no Cronômetro"><i class="fas fa-play-circle text-xl"></i></button>
-                                <button onclick="removerDiscurso('${d.id}')" class="text-red-500 hover:text-red-700 mx-1 p-1" title="Excluir"><i class="fas fa-trash"></i></button>
+                                <button onclick="carregarDiscurso('${d._id}')" class="text-green-600 hover:text-green-800 mx-1 p-1" title="Carregar no Cronômetro"><i class="fas fa-play-circle text-xl"></i></button>
+                                <button onclick="removerDiscurso('${d._id}')" class="text-red-500 hover:text-red-700 mx-1 p-1" title="Excluir"><i class="fas fa-trash"></i></button>
                             </td>
                         </tr>`;
                 });
             }
-            localStorage.setItem('discursos', JSON.stringify(discursos));
         }
 
-        function adicionarDiscurso() {
+        async function adicionarDiscurso() {
             const tema = document.getElementById('novo-tema').value;
             const orador = document.getElementById('novo-orador').value;
             const tempo = parseInt(document.getElementById('novo-tempo').value);
             if(!tema || !orador || !tempo) return alert("Preencha todos os campos!");
             
-            discursos.push({ id: Date.now().toString(), tema, orador, tempoMinutos: tempo, dia: diaAtivo });
+            const novo = { tema, orador, tempoMinutos: tempo, dia: diaAtivo };
             
-            document.getElementById('novo-tema').value = '';
-            document.getElementById('novo-orador').value = '';
-            document.getElementById('novo-tempo').value = '';
-            renderizarTabela();
+            try {
+                const resposta = await fetch('/api/discursos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(novo)
+                });
+                const discursoSalvo = await resposta.json();
+                
+                discursos.push(discursoSalvo);
+                document.getElementById('novo-tema').value = '';
+                document.getElementById('novo-orador').value = '';
+                document.getElementById('novo-tempo').value = '';
+                renderizarTabela();
+            } catch (erro) {
+                alert("Erro ao salvar no banco de dados!");
+            }
         }
 
-        function importarEmMassa() {
+        async function importarEmMassa() {
             const texto = document.getElementById('texto-importacao').value;
             const linhas = texto.split('\n');
             let adicionados = 0;
 
-            linhas.forEach(linha => {
-                // Separa usando o traço "-"
+            for (const linha of linhas) {
                 const partes = linha.split('-');
                 if(partes.length >= 3) {
                     const tema = partes[0].trim();
@@ -278,11 +297,22 @@
                     const tempo = parseInt(partes[2].trim());
                     
                     if(tema && orador && !isNaN(tempo)) {
-                        discursos.push({ id: Date.now().toString() + Math.random(), tema, orador, tempoMinutos: tempo, dia: diaAtivo });
-                        adicionados++;
+                        const novo = { tema, orador, tempoMinutos: tempo, dia: diaAtivo };
+                        try {
+                            const resposta = await fetch('/api/discursos', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(novo)
+                            });
+                            const discursoSalvo = await resposta.json();
+                            discursos.push(discursoSalvo);
+                            adicionados++;
+                        } catch (e) {
+                            console.error("Erro ao importar linha:", linha);
+                        }
                     }
                 }
-            });
+            }
 
             if(adicionados > 0) {
                 alert(`${adicionados} discursos importados com sucesso para o(a) ${diaAtivo}!`);
@@ -294,15 +324,21 @@
             }
         }
 
-        function removerDiscurso(id) {
-            discursos = discursos.filter(d => d.id !== id);
-            renderizarTabela();
+        async function removerDiscurso(id) {
+            if(!confirm("Tem certeza que deseja apagar permanentemente este discurso do banco de dados?")) return;
+            try {
+                await fetch(`/api/discursos/${id}`, { method: 'DELETE' });
+                discursos = discursos.filter(d => d._id !== id);
+                renderizarTabela();
+            } catch (erro) {
+                alert("Erro ao apagar do banco de dados!");
+            }
         }
 
         // --- FUNÇÕES DO CRONÔMETRO ---
         function carregarDiscurso(id) {
             clearInterval(timerInterval);
-            discursoAtivo = discursos.find(d => d.id === id);
+            discursoAtivo = discursos.find(d => d._id === id);
             tempoTotalSegundos = discursoAtivo.tempoMinutos * 60;
             tempoRestante = tempoTotalSegundos;
             document.getElementById('tema-atual').innerText = discursoAtivo.tema;
@@ -313,8 +349,13 @@
         function iniciarCronometro() {
             if(!discursoAtivo) return alert("Carregue um discurso na tabela primeiro.");
             clearInterval(timerInterval);
+            
+            // Grava no relógio do PC o exato milissegundo em que o cronômetro deve zerar
+            horaAlvo = Date.now() + (tempoRestante * 1000);
+            
             timerInterval = setInterval(() => {
-                tempoRestante--;
+                // Recalcula a diferença real com base no relógio do Windows (Evita travamentos ao minimizar)
+                tempoRestante = Math.ceil((horaAlvo - Date.now()) / 1000);
                 atualizarTela();
             }, 1000);
         }
@@ -325,8 +366,8 @@
         function atualizarTela() {
             const minAmarelo = parseInt(document.getElementById('cfg-amarelo').value) || 2;
             let corHex = '#113C2B';
-            if (tempoRestante <= 0) corHex = '#B91C1C'; // Vermelho
-            else if (tempoRestante <= (minAmarelo * 60)) corHex = '#D97706'; // Amarelo
+            if (tempoRestante <= 0) corHex = '#B91C1C'; 
+            else if (tempoRestante <= (minAmarelo * 60)) corHex = '#D97706'; 
 
             const min = Math.floor(Math.abs(tempoRestante) / 60).toString().padStart(2, '0');
             const sec = (Math.abs(tempoRestante) % 60).toString().padStart(2, '0');
@@ -371,16 +412,24 @@
             socket.emit('update_timer', { tipo: 'config', ...configs });
         }
 
-        function limparTudo() {
-            if(confirm("ATENÇÃO: Deseja apagar TODOS os discursos de todos os dias e resetar o sistema?")) {
-                localStorage.clear();
-                location.reload();
+        async function limparTudo() {
+            if(confirm("ATENÇÃO: Deseja apagar TODOS os discursos salvos permanentemente no banco de dados da nuvem?")) {
+                try {
+                    // Apaga cada discurso do banco de dados
+                    for (const d of discursos) {
+                        await fetch(`/api/discursos/${d._id}`, { method: 'DELETE' });
+                    }
+                    localStorage.removeItem('configuracoes');
+                    location.reload();
+                } catch (e) {
+                    alert("Erro ao tentar resetar os dados.");
+                }
             }
         }
 
         window.onload = () => {
             carregarConfigs();
-            renderizarTabela(); // Já renderiza na Sexta-feira por padrão
+            carregarDoBanco(); // Carrega os dados direto do MongoDB na inicialização
         };
     </script>
 </body>
