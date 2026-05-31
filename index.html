@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Sistema de Cronômetro - Congresso</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #F4F3EF; font-family: 'Montserrat', sans-serif; }
+        .bg-jw-green { background-color: #113C2B; }
+        .text-jw-green { color: #113C2B; }
+        .card { background-color: white; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        
+        /* Abas Principais */
+        .tab-active { background-color: #113C2B; color: white; }
+        .tab-inactive { background-color: transparent; color: #113C2B; }
+        
+        /* Abas dos Dias */
+        .dia-active { background-color: white; color: #113C2B; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .dia-inactive { background-color: transparent; color: #6b7280; }
+    </style>
+</head>
+<body class="p-4 h-screen flex flex-col">
+
+    <nav class="flex justify-between items-center mb-4 bg-white p-2 rounded-lg shadow-sm border border-gray-200 flex-shrink-0">
+        <div class="flex gap-2">
+            <button id="btn-painel" onclick="mudarAba('painel')" class="px-4 py-2 rounded font-semibold text-sm transition tab-active">
+                <i class="fas fa-desktop mr-2"></i>PAINEL DE CONTROLE
+            </button>
+            <button id="btn-config" onclick="mudarAba('config')" class="px-4 py-2 rounded font-semibold text-sm transition tab-inactive">
+                <i class="fas fa-cog mr-2"></i>CONFIGURAÇÕES
+            </button>
+        </div>
+        <div class="flex items-center gap-2 pr-4 text-sm font-bold text-gray-600">
+            Status: <span class="text-green-600">Conectado</span> 
+            <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+        </div>
+    </nav>
+
+    <div id="aba-painel" class="flex flex-col flex-1 overflow-hidden">
+        
+   <header class="mb-4 rounded-lg overflow-hidden shadow-sm border border-gray-300 flex-shrink-0 bg-white">
+            <img src="cabecalho.png" class="w-full h-auto block" alt="Cabeçalho">
+        </header>
+
+        <div class="flex gap-6 flex-1 overflow-hidden">
+            
+            <div class="w-1/2 flex flex-col gap-4 overflow-y-auto pr-2 pb-4">
+                
+                <div class="card p-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="font-bold text-sm text-gray-700 uppercase">Programação</h2>
+                        
+                        <div class="flex bg-gray-100 rounded-lg p-1 border border-gray-200">
+                            <button onclick="mudarDia('sexta')" id="btn-dia-sexta" class="px-4 py-1.5 rounded-md text-xs font-bold transition dia-active">Sexta</button>
+                            <button onclick="mudarDia('sabado')" id="btn-dia-sabado" class="px-4 py-1.5 rounded-md text-xs font-bold transition dia-inactive">Sábado</button>
+                            <button onclick="mudarDia('domingo')" id="btn-dia-domingo" class="px-4 py-1.5 rounded-md text-xs font-bold transition dia-inactive">Domingo</button>
+                        </div>
+                    </div>
+
+                    <div class="max-h-60 overflow-y-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead>
+                                <tr class="border-b text-gray-500 font-semibold sticky top-0 bg-white">
+                                    <th class="pb-2 w-10 text-center">Nº</th>
+                                    <th class="pb-2">Tema</th>
+                                    <th class="pb-2">Orador</th>
+                                    <th class="pb-2 text-center">Tempo</th>
+                                    <th class="pb-2 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-discursos"></tbody>
+                        </table>
+                        <div id="msg-vazio" class="hidden text-center text-gray-400 text-sm py-4 italic">Nenhum discurso cadastrado para este dia.</div>
+                    </div>
+                </div>
+
+                <div class="card p-4 border-l-4 border-blue-600">
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="font-bold text-sm text-gray-700 uppercase">Adicionar à Programação</h2>
+                        <button onclick="toggleImportacao()" class="text-xs font-bold text-blue-600 hover:text-blue-800 underline"><i class="fas fa-paste mr-1"></i>Importar Lista</button>
+                    </div>
+                    
+                    <div id="box-manual" class="flex gap-2">
+                        <input type="text" id="novo-tema" placeholder="Tema do discurso" class="border p-2 rounded flex-1 text-sm font-medium">
+                        <input type="text" id="novo-orador" placeholder="Orador" class="border p-2 rounded w-1/4 text-sm font-medium">
+                        <input type="number" id="novo-tempo" placeholder="Min" class="border p-2 rounded w-20 text-sm font-medium">
+                        <button onclick="adicionarDiscurso()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-blue-800 transition">ADICIONAR</button>
+                    </div>
+
+                    <div id="box-importacao" class="hidden flex-col gap-2">
+                        <p class="text-xs text-gray-500 font-medium">Cole a lista abaixo separada por traços (<strong class="text-gray-800">TEMA - ORADOR - TEMPO</strong>). Um discurso por linha.</p>
+                        <textarea id="texto-importacao" rows="4" class="border p-2 rounded w-full text-sm font-medium" placeholder="Exemplo:&#10;Alegre-se com a esperança - João Silva - 30&#10;Perseverem em oração - Marcos Paulo - 20"></textarea>
+                        <div class="flex justify-end gap-2">
+                            <button onclick="toggleImportacao()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-semibold hover:bg-gray-300">CANCELAR</button>
+                            <button onclick="importarEmMassa()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-blue-800">PROCESSAR LISTA</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card p-4 flex justify-between items-center bg-white border-l-4 border-[#113C2B]">
+                    <div>
+                        <h2 class="font-bold text-sm text-gray-700 uppercase mb-1">Discurso Atual</h2>
+                        <h3 id="tema-atual" class="font-semibold text-xl text-jw-green leading-tight">Selecione um discurso</h3>
+                        <p id="orador-atual" class="text-sm text-gray-600 mt-1">Orador: ---</p>
+                        <div class="flex gap-2 mt-4">
+                            <button onclick="iniciarCronometro()" class="bg-jw-green text-white px-4 py-2 rounded text-sm font-semibold hover:bg-green-900 shadow"><i class="fas fa-play mr-1"></i> INICIAR</button>
+                            <button onclick="pausarCronometro()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-semibold hover:bg-gray-300 shadow"><i class="fas fa-pause mr-1"></i> PAUSAR</button>
+                            <button onclick="zerarCronometro()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm font-semibold hover:bg-gray-300 shadow"><i class="fas fa-undo mr-1"></i> ZERAR</button>
+                        </div>
+                    </div>
+                    <div class="text-center w-1/3">
+                        <p class="text-xs font-bold text-gray-500 uppercase">Tempo Restante</p>
+                        <div id="relogio-painel" class="text-5xl font-semibold text-jw-green my-2">00:00</div>
+                        <div class="w-full bg-gray-200 rounded-full h-2 mb-1">
+                            <div id="barra-progresso-painel" class="bg-jw-green h-2 rounded-full transition-all duration-1000" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="w-1/2 flex flex-col">
+                <div class="flex justify-between items-center mb-2 font-bold text-sm text-gray-700 uppercase">
+                    <span>Visualização do Monitor</span>
+                    <a href="/display.html" target="_blank" class="text-xs bg-white border px-3 py-1 rounded hover:bg-gray-50 tracking-normal shadow-sm"><i class="fas fa-external-link-alt"></i> ABRIR EM TELA CHEIA</a>
+                </div>
+                <div class="w-full aspect-video border-4 border-gray-800 rounded-lg overflow-hidden bg-white shadow-lg relative">
+                    <iframe src="/display.html" class="w-full h-full border-none pointer-events-none"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="aba-config" class="hidden flex-1 flex flex-col items-center pt-10">
+        <div class="card p-8 w-full max-w-2xl">
+            <h2 class="text-center font-bold text-xl text-jw-green mb-8 uppercase tracking-widest">Configurações do Sistema</h2>
+            
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2 text-center">Título principal</label>
+                    <input type="text" id="cfg-titulo" oninput="salvarConfigs()" class="w-full border p-3 rounded-lg text-center font-semibold text-lg text-gray-800">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2 text-center">Subtítulo</label>
+                    <textarea id="cfg-subtitulo" oninput="salvarConfigs()" class="w-full border p-3 rounded-lg text-center font-medium text-gray-700" rows="2"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2 text-center">Alerta amarelo faltando quantos minutos?</label>
+                    <input type="number" id="cfg-amarelo" oninput="salvarConfigs()" class="w-full border p-3 rounded-lg text-center font-medium">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2 text-center">Rodapé</label>
+                    <input type="text" id="cfg-rodape" oninput="salvarConfigs()" class="w-full border p-3 rounded-lg text-center text-sm font-medium text-gray-500">
+                </div>
+
+                <div class="flex gap-4 pt-4">
+                    <button onclick="window.open('/display.html', '_blank')" class="flex-1 bg-jw-green text-white p-3 rounded-lg font-bold hover:bg-green-900 shadow">Abrir monitor</button>
+                    <button onclick="limparTudo()" class="flex-1 bg-red-600 text-white p-3 rounded-lg font-bold hover:bg-red-800 shadow"><i class="fas fa-trash-alt mr-2"></i>Apagar Tudo (Reset)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let diaAtivo = 'sexta'; // O dia padrão ao abrir
+        let discursos = JSON.parse(localStorage.getItem('discursos')) || [];
+        
+        // Correção para discursos salvos anteriormente sem o "dia" configurado
+        discursos.forEach(d => { if(!d.dia) d.dia = 'sexta'; });
+
+        let discursoAtivo = null;
+        let timerInterval;
+        let tempoRestante = 0;
+        let tempoTotalSegundos = 0;
+
+        const configPadrao = {
+            titulo: "Felicidade Eterna",
+            subtitulo: "Congresso 2026 - Pirapora / MG",
+            amarelo: 2,
+            rodape: "© 2026 Congresso das Testemunhas de Jeová"
+        };
+
+        // --- FUNÇÕES DE INTERFACE (ABAS E DIAS) ---
+        function mudarAba(aba) {
+            document.getElementById('aba-painel').classList.toggle('hidden', aba !== 'painel');
+            document.getElementById('aba-config').classList.toggle('hidden', aba !== 'config');
+            document.getElementById('btn-painel').className = aba === 'painel' ? "px-4 py-2 rounded font-semibold text-sm transition tab-active" : "px-4 py-2 rounded font-semibold text-sm transition tab-inactive";
+            document.getElementById('btn-config').className = aba === 'config' ? "px-4 py-2 rounded font-semibold text-sm transition tab-active" : "px-4 py-2 rounded font-semibold text-sm transition tab-inactive";
+        }
+
+        function mudarDia(dia) {
+            diaAtivo = dia;
+            const dias = ['sexta', 'sabado', 'domingo'];
+            dias.forEach(d => {
+                const btn = document.getElementById(`btn-dia-${d}`);
+                if(d === dia) {
+                    btn.className = "px-4 py-1.5 rounded-md text-xs font-bold transition dia-active";
+                } else {
+                    btn.className = "px-4 py-1.5 rounded-md text-xs font-bold transition dia-inactive";
+                }
+            });
+            renderizarTabela();
+        }
+
+        function toggleImportacao() {
+            const manual = document.getElementById('box-manual');
+            const importacao = document.getElementById('box-importacao');
+            if(manual.classList.contains('hidden')) {
+                manual.classList.remove('hidden');
+                manual.classList.add('flex');
+                importacao.classList.add('hidden');
+                importacao.classList.remove('flex');
+            } else {
+                manual.classList.add('hidden');
+                manual.classList.remove('flex');
+                importacao.classList.remove('hidden');
+                importacao.classList.add('flex');
+            }
+        }
+
+        // --- FUNÇÕES DE DADOS (DISCURSOS E CONFIG) ---
+        function renderizarTabela() {
+            const tbody = document.getElementById('tabela-discursos');
+            tbody.innerHTML = '';
+            
+            // Filtra os discursos pelo dia selecionado
+            const discursosDoDia = discursos.filter(d => d.dia === diaAtivo);
+            
+            if(discursosDoDia.length === 0) {
+                document.getElementById('msg-vazio').classList.remove('hidden');
+            } else {
+                document.getElementById('msg-vazio').classList.add('hidden');
+                discursosDoDia.forEach((d, index) => {
+                    tbody.innerHTML += `
+                        <tr class="border-b hover:bg-gray-50 transition">
+                            <td class="py-2 text-center font-bold text-gray-500">${index + 1}</td>
+                            <td class="py-2 font-semibold text-gray-800">${d.tema}</td>
+                            <td class="py-2 font-medium text-gray-600">${d.orador}</td>
+                            <td class="py-2 text-center font-bold">${d.tempoMinutos}:00</td>
+                            <td class="py-2 text-center">
+                                <button onclick="carregarDiscurso('${d.id}')" class="text-green-600 hover:text-green-800 mx-1 p-1" title="Carregar no Cronômetro"><i class="fas fa-play-circle text-xl"></i></button>
+                                <button onclick="removerDiscurso('${d.id}')" class="text-red-500 hover:text-red-700 mx-1 p-1" title="Excluir"><i class="fas fa-trash"></i></button>
+                            </td>
+                        </tr>`;
+                });
+            }
+            localStorage.setItem('discursos', JSON.stringify(discursos));
+        }
+
+        function adicionarDiscurso() {
+            const tema = document.getElementById('novo-tema').value;
+            const orador = document.getElementById('novo-orador').value;
+            const tempo = parseInt(document.getElementById('novo-tempo').value);
+            if(!tema || !orador || !tempo) return alert("Preencha todos os campos!");
+            
+            discursos.push({ id: Date.now().toString(), tema, orador, tempoMinutos: tempo, dia: diaAtivo });
+            
+            document.getElementById('novo-tema').value = '';
+            document.getElementById('novo-orador').value = '';
+            document.getElementById('novo-tempo').value = '';
+            renderizarTabela();
+        }
+
+        function importarEmMassa() {
+            const texto = document.getElementById('texto-importacao').value;
+            const linhas = texto.split('\n');
+            let adicionados = 0;
+
+            linhas.forEach(linha => {
+                // Separa usando o traço "-"
+                const partes = linha.split('-');
+                if(partes.length >= 3) {
+                    const tema = partes[0].trim();
+                    const orador = partes[1].trim();
+                    const tempo = parseInt(partes[2].trim());
+                    
+                    if(tema && orador && !isNaN(tempo)) {
+                        discursos.push({ id: Date.now().toString() + Math.random(), tema, orador, tempoMinutos: tempo, dia: diaAtivo });
+                        adicionados++;
+                    }
+                }
+            });
+
+            if(adicionados > 0) {
+                alert(`${adicionados} discursos importados com sucesso para o(a) ${diaAtivo}!`);
+                document.getElementById('texto-importacao').value = '';
+                toggleImportacao();
+                renderizarTabela();
+            } else {
+                alert("Nenhum discurso lido. Verifique se o formato está correto: TEMA - ORADOR - TEMPO");
+            }
+        }
+
+        function removerDiscurso(id) {
+            discursos = discursos.filter(d => d.id !== id);
+            renderizarTabela();
+        }
+
+        // --- FUNÇÕES DO CRONÔMETRO ---
+        function carregarDiscurso(id) {
+            clearInterval(timerInterval);
+            discursoAtivo = discursos.find(d => d.id === id);
+            tempoTotalSegundos = discursoAtivo.tempoMinutos * 60;
+            tempoRestante = tempoTotalSegundos;
+            document.getElementById('tema-atual').innerText = discursoAtivo.tema;
+            document.getElementById('orador-atual').innerText = "Orador: " + discursoAtivo.orador;
+            atualizarTela();
+        }
+
+        function iniciarCronometro() {
+            if(!discursoAtivo) return alert("Carregue um discurso na tabela primeiro.");
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                tempoRestante--;
+                atualizarTela();
+            }, 1000);
+        }
+
+        function pausarCronometro() { clearInterval(timerInterval); }
+        function zerarCronometro() { clearInterval(timerInterval); tempoRestante = tempoTotalSegundos; atualizarTela(); }
+
+        function atualizarTela() {
+            const minAmarelo = parseInt(document.getElementById('cfg-amarelo').value) || 2;
+            let corHex = '#113C2B';
+            if (tempoRestante <= 0) corHex = '#B91C1C'; // Vermelho
+            else if (tempoRestante <= (minAmarelo * 60)) corHex = '#D97706'; // Amarelo
+
+            const min = Math.floor(Math.abs(tempoRestante) / 60).toString().padStart(2, '0');
+            const sec = (Math.abs(tempoRestante) % 60).toString().padStart(2, '0');
+            const tempoFormatado = (tempoRestante < 0 ? "-" : "") + min + ":" + sec;
+            
+            let progresso = (tempoRestante / tempoTotalSegundos) * 100;
+            if(progresso < 0) progresso = 0;
+
+            document.getElementById('relogio-painel').innerText = tempoFormatado;
+            document.getElementById('relogio-painel').style.color = corHex;
+            document.getElementById('barra-progresso-painel').style.width = progresso + '%';
+            document.getElementById('barra-progresso-painel').style.backgroundColor = corHex;
+
+            socket.emit('update_timer', {
+                tipo: 'data',
+                tema: discursoAtivo.tema,
+                orador: discursoAtivo.orador,
+                tempoText: tempoFormatado,
+                cor: corHex,
+                progresso: progresso
+            });
+        }
+
+        // --- CONFIGURAÇÕES GERAIS ---
+        function carregarConfigs() {
+            const salvas = JSON.parse(localStorage.getItem('configuracoes')) || configPadrao;
+            document.getElementById('cfg-titulo').value = salvas.titulo;
+            document.getElementById('cfg-subtitulo').value = salvas.subtitulo;
+            document.getElementById('cfg-amarelo').value = salvas.amarelo;
+            document.getElementById('cfg-rodape').value = salvas.rodape;
+            socket.emit('update_timer', { tipo: 'config', ...salvas });
+        }
+
+        function salvarConfigs() {
+            const configs = {
+                titulo: document.getElementById('cfg-titulo').value,
+                subtitulo: document.getElementById('cfg-subtitulo').value,
+                amarelo: document.getElementById('cfg-amarelo').value,
+                rodape: document.getElementById('cfg-rodape').value
+            };
+            localStorage.setItem('configuracoes', JSON.stringify(configs));
+            socket.emit('update_timer', { tipo: 'config', ...configs });
+        }
+
+        function limparTudo() {
+            if(confirm("ATENÇÃO: Deseja apagar TODOS os discursos de todos os dias e resetar o sistema?")) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        window.onload = () => {
+            carregarConfigs();
+            renderizarTabela(); // Já renderiza na Sexta-feira por padrão
+        };
+    </script>
+</body>
+</html>
