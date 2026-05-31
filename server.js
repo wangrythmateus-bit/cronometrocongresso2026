@@ -1,21 +1,24 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
-// Conectando ao Banco de Dados MongoDB
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('✅ MongoDB Conectado com Sucesso!'))
-  .catch(err => console.log('❌ Erro no MongoDB:', err));
-app.use(express.json());
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const mongoose = require('mongoose');
 
-
+// 1. INICIALIZAÇÃO DO APP E SERVIDOR
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static('public'));
+// 2. CONFIGURAÇÕES DO SERVIDOR (MIDDLEWARES)
+app.use(express.json()); // Permite ler o corpo das requisições como JSON
+app.use(express.static(__dirname)); // Libera os arquivos HTML na raiz do projeto (Para o Render)
 
+// 3. CONEXÃO COM O MONGODB
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('✅ MongoDB Conectado com Sucesso!'))
+  .catch(err => console.log('❌ Erro no MongoDB:', err));
+
+// 4. WEBSOCKETS (Sincronização em Tempo Real)
 io.on('connection', (socket) => {
     console.log('Uma tela foi conectada.');
     
@@ -23,7 +26,8 @@ io.on('connection', (socket) => {
         io.emit('sync_display', data);
     });
 });
-// --- MODELO DO BANCO DE DADOS (MONGOOSE) ---
+
+// 5. MODELO DO BANCO DE DADOS (MONGOOSE)
 const discursoSchema = new mongoose.Schema({
     tema: String,
     orador: String,
@@ -32,8 +36,8 @@ const discursoSchema = new mongoose.Schema({
 });
 const Discurso = mongoose.model('Discurso', discursoSchema);
 
-// --- ROTAS DA API ---
-// 1. Ler todos os discursos
+// 6. ROTAS DA API (Comunicação Banco de Dados)
+// Ler todos os discursos
 app.get('/api/discursos', async (req, res) => {
     try {
         const discursos = await Discurso.find();
@@ -43,7 +47,7 @@ app.get('/api/discursos', async (req, res) => {
     }
 });
 
-// 2. Adicionar um novo discurso
+// Adicionar um novo discurso
 app.post('/api/discursos', async (req, res) => {
     try {
         const novoDiscurso = new Discurso(req.body);
@@ -54,7 +58,7 @@ app.post('/api/discursos', async (req, res) => {
     }
 });
 
-// 3. Apagar um discurso
+// Apagar um discurso
 app.delete('/api/discursos/:id', async (req, res) => {
     try {
         await Discurso.findByIdAndDelete(req.params.id);
@@ -63,7 +67,9 @@ app.delete('/api/discursos/:id', async (req, res) => {
         res.status(500).json({ error: 'Erro ao apagar discurso' });
     }
 });
-const PORT = 3000;
+
+// 7. INICIAR O SERVIDOR (Porta Dinâmica para o Render)
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor rodando! Acesse: http://localhost:${PORT}`);
 });
