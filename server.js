@@ -18,8 +18,6 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.log('❌ Erro no MongoDB:', err));
 
 // --- MODELOS DO BANCO DE DADOS ---
-
-// Tabela de Discursos
 const discursoSchema = new mongoose.Schema({
     tema: String,
     orador: String,
@@ -28,7 +26,6 @@ const discursoSchema = new mongoose.Schema({
 });
 const Discurso = mongoose.model('Discurso', discursoSchema);
 
-// Tabela de Usuários (Login)
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
@@ -36,78 +33,111 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
-// --- CRIAR ADMINISTRADOR PADRÃO (Automático) ---
 async function criarAdminPadrao() {
     const totalUsuarios = await User.countDocuments();
     if (totalUsuarios === 0) {
         const senhaCriptografada = await bcrypt.hash('admin123', 10);
         const admin = new User({ username: 'admin', password: senhaCriptografada, role: 'admin' });
         await admin.save();
-        console.log('👑 Usuário Admin padrão criado! (Login: admin / Senha: admin123)');
+        console.log('👑 Usuário Admin padrão criado!');
     }
 }
 criarAdminPadrao();
 
-// --- WEBSOCKETS (Cronômetro) ---
 io.on('connection', (socket) => {
     socket.on('update_timer', (data) => {
         io.emit('sync_display', data);
     });
 });
 
+// --- SEGURANÇA: VERIFICAR PULSEIRA VIP (MIDDLEWARE) ---
+function verificarToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Pega só o código após a palavra "Bearer"
+    
+    if (!token) return res.status(401).json({ error: 'Acesso negado. Faça login.' });
+
+    const chaveSecreta = process.env.JWT_SECRET || 'ChaveSuperSecretaCongresso2026';
+    jwt.verify(token, chaveSecreta, (err, user) => {
+        if (err) return res.status(403).json({ error: 'Sessão expirada ou inválida.' });
+        req.user = user; // Salva quem é o usuário que está fazendo o pedido
+        next(); // Libera a passagem
+    });
+}
+
 // --- ROTAS DA API ---
 
-// ROTA DE LOGIN (Nova)
+// 1. Fazer Login (Não precisa de token para entrar aqui)
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
-        
-        // Procura o usuário
         const user = await User.findOne({ username });
         if (!user) return res.status(400).json({ error: 'Usuário não encontrado!' });
 
-        // Verifica a senha
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) return res.status(400).json({ error: 'Senha incorreta!' });
 
-        // Gera a "Pulseira VIP" (Token)
         const chaveSecreta = process.env.JWT_SECRET || 'ChaveSuperSecretaCongresso2026';
         const token = jwt.sign({ id: user._id, role: user.role }, chaveSecreta, { expiresIn: '12h' });
         
         res.json({ token, role: user.role });
     } catch (err) {
-        res.status(500).json({ error: 'Erro no servidor durante o login' });
+        res.status(500).json({ error: 'Erro no servidor' });
     }
 });
 
-// Ler discursos
-app.get('/api/discursos', async (req, res) => {
+// 2. Criar novo usuário (Apenas Admin pode acessar)
+app.post('/api/usuarios', verificarToken, async (req, res) => {
+    // Se não for admin, é barrado na hora
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Apenas administradores podem criar usuários.' });
+    }
+
+    try {
+        const { username, password, role } = req.body;
+        const userExiste = await User.findOne({ username });
+        if (userExiste) return res.status(400).json({ error: 'Esse nome de usuário já existe!' });
+
+        const senhaCriptografada = await bcrypt.hash(password, 10);
+        const novoUser = new User({ username, password: senhaCriptografada, role });
+        await novoUser.save();
+        
+        res.json({ message: 'Usuário criado com sucesso!' });
+    } catch (err) {
+        res.status(500).json({ error: 'Erro ao criar usuário.' });
+    }
+});
+
+// 3. Rotas de Discursos (Protegidas pelo verificarToken)
+app.get('/api/discursos', verificarToken, async (req, res) => {
     try {
         const discursos = await Discurso.find();
         res.json(discursos);
     } catch (err) {
-        res.status(500).json({ error: 'Erro ao buscar discursos' });
+        res.status(500).json({ error: 'Erro ao buscar' });
     }
 });
 
-// Adicionar discurso
-app.post('/api/discursos', async (req, res) => {
+app.post('/api/discursos', verificarToken, async (req, res) => {
     try {
         const novoDiscurso = new Discurso(req.body);
         await novoDiscurso.save();
         res.json(novoDiscurso);
     } catch (err) {
-        res.status(500).json({ error: 'Erro ao salvar discurso' });
+        res.status(500).json({ error: 'Erro ao salvar' });
     }
 });
 
-// Apagar discurso
-app.delete('/api/discursos/:id', async (req, res) => {
+// Apenas Admin pode apagar discursos
+app.delete('/api/discursos/:id', verificarToken, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Apenas administradores podem apagar discursos.' });
+    }
     try {
         await Discurso.findByIdAndDelete(req.params.id);
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: 'Erro ao apagar discurso' });
+        res.status(500).json({ error: 'Erro ao apagar' });
     }
 });
 
